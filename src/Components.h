@@ -101,8 +101,8 @@ struct Light : public Camera {
     int type; //0 - directional; 1 - point; 2 - spot
     lm::vec3 direction;
     lm::vec3 color;
-    float linear_att;
-    float quadratic_att;
+    float linear_att; //kl
+    float quadratic_att; //Kq
     float spot_inner;
     float spot_outer;
 	int resolution;

@@ -58,9 +58,9 @@ void Game::init(int w, int h) {
     int ent_light_dir = ECS.createEntity("light_dir");
     ECS.getComponentFromEntity<Transform>(ent_light_dir).translate(5, 9, 10);
     Light& light_comp_dir = ECS.createComponentForEntity<Light>(ent_light_dir);
-    light_comp_dir.color = lm::vec3(0.99f, 0.99f, 0.99f);
+    light_comp_dir.color = lm::vec3(0.29f, 0.29f, 0.29f);
     light_comp_dir.direction = lm::vec3(-0.5,-0.5,-0.5);
-    light_comp_dir.type = 2; //change for direction or spot
+    light_comp_dir.type = 0; //change for direction or spot
     light_comp_dir.linear_att = 0.027f;
     light_comp_dir.quadratic_att = 0.0028f;
     light_comp_dir.spot_inner = 50.0f;

@@ -43,6 +43,12 @@ void GraphicsSystem::init(int window_width, int window_height, std::string asset
 	geometries_.push_back(ss_geom);
 	screen_space_geom_ = (int)(geometries_.size() - 1);
 
+	//create a sphere geometry
+
+
+	sphere_volume_geom_ = createGeometryFromFile("data/assets/sphere.obj");
+
+
     //screen space texture shader
     screen_space_shader_ = new Shader("data/shaders/screen.vert", "data/shaders/screen.frag");
     
@@ -57,7 +63,7 @@ void GraphicsSystem::init(int window_width, int window_height, std::string asset
     deferred_shader_ = new Shader("data/shaders/deferred.vert", "data/shaders/deferred.frag");
     gbuffer_.initGbuffer(window_width, window_height);
     
-	
+	deferred_volume_shader_ = new Shader("data/shaders/deferred_volume.vert", "data/shaders/deferred_volume.frag");
 }
 
 //called after loading everything
@@ -103,13 +109,77 @@ void GraphicsSystem::update(float dt) {
 	/* SCREEN BUFFER */
 	bindAndClearScreen_();
     resetShaderAndMaterial_();
-    renderGbuffer();
+  //  renderGbuffer();
+	renderLightVolumes();
     renderEnvironment_();
     
 }
 
 void GraphicsSystem::renderLightVolumes() {
-    
+
+	useShader(deferred_volume_shader_);
+
+	//set light array tells shader where UBO memory is
+	shader_->setUniformBlock(U_LIGHTS_UBO, LIGHTS_BINDING_POINT);
+
+	//uplaod gbuffer textures
+	shader_->setTexture(U_TEX_POSITION, gbuffer_.color_textures[0], 8);
+	shader_->setTexture(U_TEX_NORMAL, gbuffer_.color_textures[1], 9);
+	shader_->setTexture(U_TEX_ALBEDO, gbuffer_.color_textures[2], 10);
+
+
+	glBlendFunc(GL_ONE, GL_ONE);
+	glEnable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	auto lights = ECS.getAllComponents<Light>();
+
+	for (size_t i = 0; i < lights.size(); i++) {
+		if (lights[i].type == 0) {
+			shader_->setUniform(U_LIGHT_ID,(int)i);
+			lm::mat4 mvp;
+			shader_->setUniform(U_MVP,mvp);
+			geometries_[screen_space_geom_].render();
+		}
+
+	}
+
+
+	glCullFace(GL_FRONT);
+	//render a sphere for every light
+	
+	for (size_t i = 0; i < lights.size(); i++) {
+		if (lights[i].type != 1)
+			continue;
+
+		shader_->setUniform(U_LIGHT_ID, (int)i);
+
+		//find position of light
+		lm::vec3 light_pos = ECS.getComponentFromEntity<Transform>(lights[i].owner).position();
+		lm::mat4 model;
+
+		//set model matrix of sphere
+		model.scale(lights[i].radius, lights[i].radius, lights[i].radius);
+		model.translate(light_pos);
+
+		//create mvp
+		lm::mat4 view_projection = ECS.getComponentInArray<Camera>(ECS.main_camera).view_projection;
+		lm::mat4 mvp = view_projection * model;
+
+		shader_->setUniform(U_MVP, mvp);
+
+		//draw sphere
+		geometries_[sphere_volume_geom_].render();
+	}
+	glCullFace(GL_BACK);
+
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+
+	//blit depth
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer_.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+	glBlitFramebuffer(0, 0, viewport_width_, viewport_height_, 0, 0, viewport_width_, viewport_height_, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
 }
 
 void GraphicsSystem::renderGbuffer() {
